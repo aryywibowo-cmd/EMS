@@ -59,8 +59,6 @@
 </head>
 <body>
 
-<!-- Aplikasi web (Google Apps Script) dimuat di sini -->
-<iframe id="app" title="EMS" allow="camera; microphone; geolocation; clipboard-read; clipboard-write; fullscreen; web-share"></iframe>
 
 <div id="splash">
   <img class="logo" src="icons/icon-192.png" alt="EMS">
@@ -94,36 +92,80 @@
   var APP_URL = 'https://script.google.com/macros/s/AKfycbwtrdBuY-YHKkA6je_V6IlL1aOHJyWdqE3mvqXHUnSyr3bIs2nM4kei7O-9XxBF1TlM_g/exec';
   var BATAS_TUNGGU = 25000;   // ms sebelum dianggap gagal memuat
 
-  var frame = document.getElementById('app');
   var splash = document.getElementById('splash');
   var statusEl = document.getElementById('status');
-  var timer = null, sudahMuat = false;
+  var timer = null, sudahMuat = false, sedangMuat = false;
 
-  function selesai() {
-    sudahMuat = true; clearTimeout(timer);
-    frame.classList.add('siap'); splash.classList.add('hilang');
-  }
+  // Pengganti google.script.run: memanggil doPost web app lewat fetch TANPA cookie Google,
+  // sehingga tidak terkena error "tidak dapat membuka file" di HP yang login akun Google.
+  var POLYFILL = '(' + function(URL) {
+    function runner(ok, fail) {
+      var base = {
+        withSuccessHandler: function(f) { return runner(f, fail); },
+        withFailureHandler: function(f) { return runner(ok, f); },
+        withUserObject: function() { return runner(ok, fail); }
+      };
+      return new Proxy(base, { get: function(t, fn) {
+        if (fn in t) return t[fn];
+        return function() {
+          var args = Array.prototype.slice.call(arguments);
+          fetch(URL, { method: 'POST', credentials: 'omit', redirect: 'follow',
+                       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                       body: JSON.stringify({ fn: fn, args: args }) })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+              if (res && res.ok) { if (ok) ok(res.data); }
+              else if (fail) fail(new Error((res && res.error) || 'Gagal memproses permintaan.'));
+            })
+            .catch(function(e) { if (fail) fail(new Error('Koneksi ke server gagal. Periksa internet lalu coba lagi.')); });
+        };
+      } });
+    }
+    window.google = { script: { run: runner(null, null), host: { close: function() {} } } };
+  } + ')(' + JSON.stringify(APP_URL) + ');';
+
+  var HEAD_TAMBAHAN =
+    '<meta name="theme-color" content="#0e2a1b">' +
+    '<link rel="manifest" href="manifest.webmanifest">' +
+    '<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">' +
+    '<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">' +
+    '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">' +
+    '<meta name="apple-mobile-web-app-title" content="EMS"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">' +
+    '<style>@media (display-mode: standalone) { body { padding-top: calc(20px + env(safe-area-inset-top)) !important; } }</style>' +
+    '<script>' + POLYFILL + '<\/script>';
+
   function gagal(pesan) {
-    clearTimeout(timer);
+    sedangMuat = false; clearTimeout(timer);
     document.getElementById('loader').style.display = 'none';
     document.getElementById('aksi').style.display = 'flex';
     statusEl.innerText = pesan;
   }
   function muat(ulang) {
+    if (sedangMuat) return;
     if (!navigator.onLine) { gagal('Tidak ada koneksi internet. Periksa data seluler / Wi-Fi, lalu coba lagi.'); return; }
-    sudahMuat = false;
-    splash.classList.remove('hilang'); frame.classList.remove('siap');
+    sedangMuat = true;
     document.getElementById('loader').style.display = '';
     document.getElementById('aksi').style.display = 'none';
     statusEl.innerText = 'Memuat aplikasi...';
     var q = location.search.replace(/^\?/, '');
-    frame.src = APP_URL + (q ? '?' + q : '') + (ulang ? (q ? '&' : '?') + 'r=' + Date.now() : '');
+    var url = APP_URL + '?view=raw' + (q ? '&' + q : '') + '&r=' + Date.now();
     timer = setTimeout(function() { if (!sudahMuat) gagal('Aplikasi lambat merespons. Coba lagi atau buka di browser.'); }, BATAS_TUNGGU);
+    fetch(url, { credentials: 'omit', redirect: 'follow', cache: 'no-store' })
+      .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then(function(html) {
+        if (sudahMuat) return;
+        if (html.indexOf('include(') !== -1 || html.indexOf('<html') === -1) throw new Error('Format halaman tidak dikenali');
+        sudahMuat = true; clearTimeout(timer);
+        // Sisipkan polyfill & meta aplikasi di awal <head>, lalu ganti seluruh halaman
+        html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, function(m) { return m + HEAD_TAMBAHAN; })
+                                         : HEAD_TAMBAHAN + html;
+        document.open(); document.write(html); document.close();
+      })
+      .catch(function(e) { gagal('Gagal memuat aplikasi (' + (e && e.message ? e.message : e) + '). Coba lagi atau buka di browser.'); });
   }
   function bukaBrowser() { window.open(APP_URL, '_blank'); }
-  frame.addEventListener('load', function() { if (frame.src) selesai(); });
   window.addEventListener('online', function() { if (!sudahMuat) muat(true); });
-  window.addEventListener('offline', function() { statusEl.innerText = 'Koneksi terputus.'; });
 
   // ---------------------------------------------------------------------
   // Ajakan pasang ke layar utama
@@ -138,7 +180,7 @@
   function sudahDitutup() { try { return localStorage.getItem('ems_pasang_tutup') === '1'; } catch (e) { return false; } }
   function tutupPasang() { pasangEl.style.display = 'none'; try { localStorage.setItem('ems_pasang_tutup', '1'); } catch (e) {} }
   function tampilPasang(teks, tombolHtml) {
-    if (standalone || sudahDitutup()) return;
+    if (standalone || sudahDitutup() || sudahMuat || !document.getElementById('pasang-teks')) return;
     document.getElementById('pasang-teks').innerHTML = teks;
     document.getElementById('pasang-tombol').innerHTML = tombolHtml || '';
     pasangEl.style.display = 'block';

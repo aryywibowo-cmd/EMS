@@ -1,6 +1,6 @@
 // Service worker EMS: simpan tampilan pembuka (bukan data) agar aplikasi cepat terbuka.
 // Data selalu diambil langsung dari Google Apps Script (tidak di-cache).
-var CACHE = 'ems-shell-v1';
+var CACHE = 'ems-shell-v2';
 var SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png'];
 
 self.addEventListener('install', function(e) {
