@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>EMS - Plaza Toyota Tendean</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Employee Monitoring System - Plaza Toyota Tendean">
+<meta name="theme-color" content="#0e2a1b">
+<!-- Android / PWA -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<!-- iPhone -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EMS">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  :root { --bg1: #0e2a1b; --bg2: #133a26; --hijau: #34a862; --emas: #ffc56b; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg1); overflow: hidden; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #eef6f0;
+         padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+  #app { position: fixed; left: 0; right: 0; bottom: 0; top: env(safe-area-inset-top); width: 100%; height: calc(100% - env(safe-area-inset-top)); border: 0; background: #fff; opacity: 0; transition: opacity .35s; }
+  #app.siap { opacity: 1; }
+
+  /* Layar pembuka */
+  #splash { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+            background: radial-gradient(circle at 30% 20%, #1f5c3a 0%, var(--bg2) 40%, var(--bg1) 100%); transition: opacity .45s, visibility .45s; }
+  #splash.hilang { opacity: 0; visibility: hidden; }
+  .logo { width: 96px; height: 96px; border-radius: 24px; box-shadow: 0 12px 40px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.08); animation: muncul .6s ease-out; }
+  .judul { font-size: 20px; font-weight: 800; letter-spacing: .3px; text-align: center; }
+  .sub { font-size: 13px; opacity: .8; text-align: center; margin-top: -10px; }
+  .loader { width: 160px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .loader i { display: block; width: 40%; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--hijau), var(--emas)); animation: jalan 1.1s ease-in-out infinite; }
+  .status { font-size: 12.5px; opacity: .75; min-height: 18px; text-align: center; padding: 0 24px; }
+  .btn { border: 0; border-radius: 999px; padding: 11px 22px; font: 700 14px inherit; font-family: inherit; color: #0e2a1b; background: var(--hijau); cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.3); }
+  .btn.sec { background: rgba(255,255,255,.12); color: #eef6f0; }
+  .aksi { display: none; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .copy { position: absolute; bottom: calc(18px + env(safe-area-inset-bottom)); left: 0; right: 0; text-align: center; font-size: 11px; opacity: .65; letter-spacing: .3px; padding: 0 12px; }
+  .copy b { color: var(--emas); font-weight: 700; }
+
+  /* Ajakan pasang aplikasi (hanya saat dibuka dari browser, bukan dari ikon) */
+  #pasang { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 20; display: none;
+            background: rgba(14,42,27,.96); border: 1px solid rgba(255,255,255,.14); border-radius: 18px; padding: 14px 16px;
+            box-shadow: 0 16px 40px rgba(0,0,0,.45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: naik .4s ease-out; }
+  #pasang .row { display: flex; align-items: center; gap: 12px; }
+  #pasang img { width: 44px; height: 44px; border-radius: 11px; flex-shrink: 0; }
+  #pasang .t { font-weight: 800; font-size: 14px; }
+  #pasang .d { font-size: 12.5px; opacity: .85; line-height: 1.45; margin-top: 2px; }
+  #pasang .x { margin-left: auto; align-self: flex-start; background: none; border: 0; color: #eef6f0; font-size: 20px; opacity: .7; cursor: pointer; padding: 0 4px; }
+  #pasang .tombol { margin-top: 10px; display: flex; gap: 8px; justify-content: flex-end; }
+  .ikon-share { display: inline-block; vertical-align: -3px; }
+
+  @keyframes jalan { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+  @keyframes muncul { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes naik { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+</style>
+</head>
+<body>
+
+<!-- Aplikasi web (Google Apps Script) dimuat di sini -->
+<iframe id="app" title="EMS" allow="camera; microphone; geolocation; clipboard-read; clipboard-write; fullscreen; web-share"></iframe>
+
+<div id="splash">
+  <img class="logo" src="icons/icon-192.png" alt="EMS">
+  <div class="judul">Employee Monitoring System</div>
+  <div class="sub">Plaza Toyota Tendean</div>
+  <div class="loader" id="loader"><i></i></div>
+  <div class="status" id="status">Memuat aplikasi...</div>
+  <div class="aksi" id="aksi">
+    <button class="btn" onclick="muat(true)">Coba lagi</button>
+    <button class="btn sec" onclick="bukaBrowser()">Buka di browser</button>
+  </div>
+  <div class="copy">EMS v1.0 · © 2026 <b>Ary Yanto Wibowo</b> · Internal Use Only</div>
+</div>
+
+<div id="pasang">
+  <div class="row">
+    <img src="icons/icon-192.png" alt="">
+    <div>
+      <div class="t">Pasang aplikasi EMS</div>
+      <div class="d" id="pasang-teks"></div>
+    </div>
+    <button class="x" onclick="tutupPasang()" aria-label="Tutup">×</button>
+  </div>
+  <div class="tombol" id="pasang-tombol"></div>
+</div>
+
+<script>
+  // =====================================================================
+  // ALAMAT WEB APP (Google Apps Script). Ganti di sini bila deployment berubah.
+  // =====================================================================
+  var APP_URL = 'https://script.google.com/macros/s/AKfycbwtrdBuY-YHKkA6je_V6IlL1aOHJyWdqE3mvqXHUnSyr3bIs2nM4kei7O-9XxBF1TlM_g/exec';
+  var BATAS_TUNGGU = 25000;   // ms sebelum dianggap gagal memuat
+
+  var frame = document.getElementById('app');
+  var splash = document.getElementById('splash');
+  var statusEl = document.getElementById('status');
+  var timer = null, sudahMuat = false;
+
+  function selesai() {
+    sudahMuat = true; clearTimeout(timer);
+    frame.classList.add('siap'); splash.classList.add('hilang');
+  }
+  function gagal(pesan) {
+    clearTimeout(timer);
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('aksi').style.display = 'flex';
+    statusEl.innerText = pesan;
+  }
+  function muat(ulang) {
+    if (!navigator.onLine) { gagal('Tidak ada koneksi internet. Periksa data seluler / Wi-Fi, lalu coba lagi.'); return; }
+    sudahMuat = false;
+    splash.classList.remove('hilang'); frame.classList.remove('siap');
+    document.getElementById('loader').style.display = '';
+    document.getElementById('aksi').style.display = 'none';
+    statusEl.innerText = 'Memuat aplikasi...';
+    var q = location.search.replace(/^\?/, '');
+    frame.src = APP_URL + (q ? '?' + q : '') + (ulang ? (q ? '&' : '?') + 'r=' + Date.now() : '');
+    timer = setTimeout(function() { if (!sudahMuat) gagal('Aplikasi lambat merespons. Coba lagi atau buka di browser.'); }, BATAS_TUNGGU);
+  }
+  function bukaBrowser() { window.open(APP_URL, '_blank'); }
+  frame.addEventListener('load', function() { if (frame.src) selesai(); });
+  window.addEventListener('online', function() { if (!sudahMuat) muat(true); });
+  window.addEventListener('offline', function() { statusEl.innerText = 'Koneksi terputus.'; });
+
+  // ---------------------------------------------------------------------
+  // Ajakan pasang ke layar utama
+  // ---------------------------------------------------------------------
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  var ua = navigator.userAgent || '';
+  var isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var isAndroid = /Android/i.test(ua);
+  var promptPasang = null;
+  var pasangEl = document.getElementById('pasang');
+
+  function sudahDitutup() { try { return localStorage.getItem('ems_pasang_tutup') === '1'; } catch (e) { return false; } }
+  function tutupPasang() { pasangEl.style.display = 'none'; try { localStorage.setItem('ems_pasang_tutup', '1'); } catch (e) {} }
+  function tampilPasang(teks, tombolHtml) {
+    if (standalone || sudahDitutup()) return;
+    document.getElementById('pasang-teks').innerHTML = teks;
+    document.getElementById('pasang-tombol').innerHTML = tombolHtml || '';
+    pasangEl.style.display = 'block';
+  }
+
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault(); promptPasang = e;
+    tampilPasang('Pasang EMS di HP agar bisa dibuka dari ikon, layar penuh tanpa bilah browser.',
+                 '<button class="btn" onclick="pasangSekarang()">Pasang</button>');
+  });
+  function pasangSekarang() {
+    if (!promptPasang) return;
+    promptPasang.prompt();
+    promptPasang.userChoice.finally(function() { promptPasang = null; pasangEl.style.display = 'none'; });
+  }
+  window.addEventListener('appinstalled', function() { pasangEl.style.display = 'none'; });
+
+  setTimeout(function() {
+    if (standalone || promptPasang) return;
+    if (isIOS) {
+      tampilPasang('Di <b>Safari</b>: ketuk <svg class="ikon-share" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v13"/><path d="M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg> <b>Bagikan</b>, lalu pilih <b>Tambah ke Layar Utama</b>.');
+    } else if (isAndroid) {
+      tampilPasang('Di <b>Chrome</b>: ketuk menu <b>⋮</b>, lalu pilih <b>Instal aplikasi</b> / <b>Tambahkan ke layar utama</b>.');
+    }
+  }, 4000);
+
+  // Service worker: tampilan pembuka tetap cepat & ada pesan jika offline
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() { navigator.serviceWorker.register('sw.js').catch(function() {}); });
+  }
+
+  muat(false);
+</script>
+</body>
+</html>
